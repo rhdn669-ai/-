@@ -361,13 +361,18 @@ const dbRef = db.ref('panels');
 
 let isSyncing = false;
 
+// Firebase 키에서 특수문자 처리
+const encodeKey = k => k.replace(/\//g,'__slash__').replace(/\./g,'__dot__').replace(/\$/g,'__dollar__').replace(/\[/g,'__lb__').replace(/\]/g,'__rb__');
+const decodeKey = k => k.replace(/__slash__/g,'/').replace(/__dot__/g,'.').replace(/__dollar__/g,'$').replace(/__lb__/g,'[').replace(/__rb__/g,']');
+const encodeObj = obj => { const r={}; Object.entries(obj).forEach(([k,v])=>{ r[encodeKey(k)]=v; }); return r; };
+const decodeObj = obj => { const r={}; Object.entries(obj).forEach(([k,v])=>{ r[decodeKey(k)]=v; }); return r; };
+
 const save = () => {
-  const arr = panels.map(p=>({id:p.id,부품상태:p.부품상태,mp하위상태:p.mp하위상태,검수완료:p.검수완료,출고완료:p.출고완료,비고:p.비고,현장메모:p.현장메모,문제비고:p.문제비고||{},이력:p.이력||[]}));
-  // Firebase는 배열을 객체로 변환하므로 id를 키로 사용
+  const arr = panels.map(p=>({id:p.id,부품상태:encodeObj(p.부품상태),mp하위상태:encodeObj(p.mp하위상태),검수완료:p.검수완료,출고완료:p.출고완료,비고:p.비고,현장메모:p.현장메모,문제비고:encodeObj(p.문제비고||{}),이력:p.이력||[]}));
   const obj = {};
   arr.forEach(p => { obj['p'+p.id] = p; });
   dbRef.set(obj).catch(e=>console.error('FB save error',e));
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(arr));}catch(e){}
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(panels.map(p=>({id:p.id,부품상태:p.부품상태,mp하위상태:p.mp하위상태,검수완료:p.검수완료,출고완료:p.출고완료,비고:p.비고,현장메모:p.현장메모,문제비고:p.문제비고||{},이력:p.이력||[]}))));}catch(e){}
 };
 
 /* 실시간 수신 */
@@ -382,7 +387,7 @@ dbRef.on('value', snapshot => {
   panels = RAW.map(d => {
     const base = buildPanel(d), sv = saved.find(x=>x.id===d.id);
     if(!sv) return base;
-    return recompute({...base,부품상태:sv.부품상태||base.부품상태,mp하위상태:sv.mp하위상태||base.mp하위상태,검수완료:sv.검수완료||false,출고완료:sv.출고완료||false,비고:sv.비고||"",현장메모:sv.현장메모||"",문제비고:sv.문제비고||{},이력:sv.이력||[]});
+    return recompute({...base,부품상태:decodeObj(sv.부품상태||{})||base.부품상태,mp하위상태:decodeObj(sv.mp하위상태||{})||base.mp하위상태,검수완료:sv.검수완료||false,출고완료:sv.출고완료||false,비고:sv.비고||"",현장메모:sv.현장메모||"",문제비고:decodeObj(sv.문제비고||{}),이력:sv.이력||[]});
   });
   // 임포트로 추가된 패널 (RAW에 없는 것)
   saved.forEach(sv => {
